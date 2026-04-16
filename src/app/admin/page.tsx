@@ -1,10 +1,10 @@
 'use client';
 // src/app/admin/page.tsx
 
-// ✅ كل الـ imports بمسارات نسبية صحيحة
-import { useAnalytics } from '../../../hooks/useAnalytics';
-import { useUIStore } from '../../../store/cartStore';
-import type { OrderStatus } from '../../../types';
+// ✅ التصحيح: مسارات قصيرة وصحيحة
+import { useAnalytics } from './useAnalytics';
+import { useUIStore } from '../../store/cartStore';
+import type { OrderStatus } from '../../types';
 
 const STATUS_COLOR: Record<OrderStatus, string> = {
   pending:          'bg-amber-100  text-amber-800  dark:bg-amber-900/30  dark:text-amber-300',
