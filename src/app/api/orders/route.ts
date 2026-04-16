@@ -68,7 +68,7 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
 
     let subtotal = 0;
     const orderItems = items.map(item => {
-      const product = products.find(p => p._id.toString() === item.productId)!;
+      const product = products.find(p => String(p._id) === item.productId)!;
       if (product.stock < item.quantity)
         throw Object.assign(new Error(`"${product.nameEn}" only has ${product.stock} units in stock`), { status: 400 });
       subtotal += product.price * item.quantity;
