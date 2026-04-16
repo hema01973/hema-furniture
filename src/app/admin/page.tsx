@@ -1,6 +1,6 @@
 'use client';
 // src/app/admin/page.tsx
-import { useAnalytics } from '@/hooks/useProducts';
+import { useAnalytics } from '@/hooks/useAnalytics';
 import { useUIStore } from '@/store/cartStore';
 import type { OrderStatus } from '@/types';
 
