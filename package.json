@@ -13,7 +13,8 @@
     "test": "jest --passWithNoTests",
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "vercel-build": "npm install --legacy-peer-deps && next build"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",
@@ -28,7 +29,7 @@
     "mongoose": "^8.5.0",
     "next": "^14.2.5",
     "next-auth": "^4.24.7",
-    "nodemailer": "^8.0.5",
+    "nodemailer": "^7.0.7",
     "qrcode": "^1.5.4",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
