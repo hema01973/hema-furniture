@@ -11,9 +11,10 @@ export const GET = withErrorHandler(async (req: NextRequest, ctx: unknown) => {
   const { params } = ctx as Ctx;
   return withAuth(req, async (_req, session) => {
     await connectDB();
-    const order = await Order.findById(params.id).lean();
-    if (!order) return err('Order not found', 404);
-    if (session!.user.role === 'customer' && order.userId?.toString() !== session!.user.id) return err('Forbidden', 403);
+    // ✅ أضف 'as any' عشان TypeScript يعرف إن النتيجة أوبجكت مش مصفوفة
+const order = await Order.findById(params.id).lean() as any;
+if (!order) return err('Order not found', 404);
+if (session!.user.role === 'customer' && order.userId?.toString() !== session!.user.id) return err('Forbidden', 403);
     return ok(order);
   });
 });
