@@ -1,56 +1,8 @@
-// src/app/api/products/[id]/route.ts
+// src/app/api/orders/route.ts
 import { NextRequest } from 'next/server';
 import { z } from 'zod';
-import { connectDB, Product } from '@/lib/mongodb';
-import { ok, err, withErrorHandler, withAuth, validateBody } from '@/lib/api';
-
-type Context = { params: { id: string } };
-
-// GET /api/products/:id
-export const GET = withErrorHandler(async (_req: NextRequest, ctx: unknown) => {
-  const { params } = ctx as Context;
-  await connectDB();
-
-  // Support both MongoDB ID and slug
-  const query = params.id.match(/^[a-f\d]{24}$/i)
-    ? { _id: params.id }
-    : { slug: params.id };
-
-  const product = await Product.findOne({ ...query, isActive: true }).lean();
-  if (!product) return err('Product not found', 404);
-  return ok(product);
-});
-
-// PUT /api/products/:id
-export const PUT = withErrorHandler(async (req: NextRequest, ctx: unknown) => {
-  const { params } = ctx as Context;
-  return withAuth(req, async () => {
-    await connectDB();
-    const body = await req.json();
-    const product = await Product.findByIdAndUpdate(params.id, body, { new: true, runValidators: true });
-    if (!product) return err('Product not found', 404);
-    return ok(product);
-  }, ['admin', 'staff']);
-});
-
-// DELETE /api/products/:id
-export const DELETE = withErrorHandler(async (req: NextRequest, ctx: unknown) => {
-  const { params } = ctx as Context;
-  return withAuth(req, async () => {
-    await connectDB();
-    const product = await Product.findByIdAndUpdate(
-      params.id, { isActive: false }, { new: true }
-    );
-    if (!product) return err('Product not found', 404);
-    return ok({ message: 'Product deactivated' });
-  }, ['admin']);
-});
-
-// ═══════════════════════════════════════════════════════════════
-// src/app/api/orders/route.ts
-// ═══════════════════════════════════════════════════════════════
-import { connectDB as connectDB2, Order, Product as ProductModel, Coupon } from '@/lib/mongodb';
-import { ok as ok2, err as err2, withErrorHandler as weh2, withAuth as wa2, validateBody as vb2, getPagination as gp2 } from '@/lib/api';
+import { connectDB, Order, Product as ProductModel, Coupon } from '@/lib/mongodb';
+import { ok, err, withErrorHandler, withAuth, validateBody, getPagination } from '@/lib/api';
 
 const CreateOrderSchema = z.object({
   customer: z.object({
@@ -75,16 +27,17 @@ const CreateOrderSchema = z.object({
   notes:         z.string().optional(),
 });
 
-export const GET_ORDERS = weh2(async (req: NextRequest) => {
-  return wa2(req, async (_req, session) => {
-    await connectDB2();
-    const { page, limit, skip } = gp2(req);
+// GET /api/orders
+export const GET = withErrorHandler(async (req: NextRequest) => {
+  return withAuth(req, async (_req, session) => {
+    await connectDB();
+    const { page, limit, skip } = getPagination(req);
     const url = new URL(req.url);
     const status    = url.searchParams.get('status');
     const isAdmin   = session!.user.role === 'admin';
 
     const filter: Record<string, unknown> = {};
-    if (!isAdmin) filter.userId = session!.user.id;  // customers see only their orders
+    if (!isAdmin) filter.userId = session!.user.id;
     if (status)   filter.status = status;
 
     const [orders, total] = await Promise.all([
@@ -92,21 +45,22 @@ export const GET_ORDERS = weh2(async (req: NextRequest) => {
       Order.countDocuments(filter),
     ]);
 
-    return ok2({ orders, pagination: { page, limit, total, pages: Math.ceil(total / limit) } });
+    return ok({ orders, pagination: { page, limit, total, pages: Math.ceil(total / limit) } });
   });
 });
 
-export const POST_ORDERS = weh2(async (req: NextRequest) => {
-  const validation = await vb2(req, CreateOrderSchema);
+// POST /api/orders
+export const POST = withErrorHandler(async (req: NextRequest) => {
+  const validation = await validateBody(req, CreateOrderSchema);
   if ('error' in validation) return validation.error;
 
-  await connectDB2();
+  await connectDB();
   const { customer, shippingAddress, items, paymentMethod, couponCode, notes } = validation.data;
 
   // Fetch products and validate stock
   const productIds = items.map(i => i.productId);
   const products = await ProductModel.find({ _id: { $in: productIds }, isActive: true });
-  if (products.length !== productIds.length) return err2('One or more products not found', 404);
+  if (products.length !== productIds.length) return err('One or more products not found', 404);
 
   let subtotal = 0;
   const orderItems = items.map(item => {
@@ -168,5 +122,5 @@ export const POST_ORDERS = weh2(async (req: NextRequest) => {
     console.error('Email send failed:', e);
   }
 
-  return ok2(order, 201);
+  return ok(order, 201);
 });
