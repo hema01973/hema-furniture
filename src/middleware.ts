@@ -1,7 +1,6 @@
 // src/middleware.ts — Production: nonce CSP, fail-closed auth APIs, security headers
 import { NextRequest, NextResponse } from 'next/server';
 import { getToken } from 'next-auth/jwt';
-import { randomBytes } from 'crypto';
 
 const ADMIN_PATHS     = ['/admin'];
 const PROTECTED_PATHS = ['/checkout', '/orders', '/account'];
@@ -34,17 +33,21 @@ function buildCSP(nonce: string): string {
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
-  // Skip static assets — no auth/header logic needed
+  // ✅ Skip static assets and files with extensions
   if (
     pathname.startsWith('/_next') ||
     pathname.startsWith('/images') ||
-    /\.\w{1,6}$/.test(pathname)
-  ) return NextResponse.next();
+    pathname.includes('/favicon.ico') ||
+    // ✅ Better regex: only skip actual static files (css, js, images, fonts)
+    /\.(css|js|ico|png|jpg|jpeg|svg|webp|woff|woff2|ttf|eot)$/i.test(pathname)
+  ) {
+    return NextResponse.next();
+  }
 
-  const nonce = randomBytes(16).toString('base64');
-  const res   = NextResponse.next({
-    request: { headers: new Headers({ ...Object.fromEntries(req.headers), 'x-nonce': nonce }) },
-  });
+  // ✅ Generate nonce safely for Edge Runtime
+  const nonce = Buffer.from(crypto.randomUUID()).toString('base64');
+  
+  const res = NextResponse.next();
 
   // Security headers
   res.headers.set('Content-Security-Policy', buildCSP(nonce));
@@ -57,6 +60,9 @@ export async function middleware(req: NextRequest) {
   if (process.env.NODE_ENV === 'production') {
     res.headers.set('Strict-Transport-Security', 'max-age=63072000; includeSubDomains; preload');
   }
+  
+  // Add nonce to response headers
+  res.headers.set('x-nonce', nonce);
 
   const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
 
@@ -86,10 +92,8 @@ export async function middleware(req: NextRequest) {
     return res;
   }
 
-  // Auth-sensitive APIs (forgot-password, MFA) — always apply rate limit in middleware too
-  // The API handlers themselves also apply fail-closed rate limiting
+  // Auth-sensitive APIs
   if (AUTH_API.some(p => pathname.startsWith(p))) {
-    // Let the handler apply rate limiting; middleware just passes through
     return res;
   }
 
@@ -97,5 +101,15 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|.*\\.(?:ico|png|jpg|jpeg|svg|webp|css|js|woff2?)).*)',],
+  matcher: [
+    /*
+     * Match all request paths except for the ones starting with:
+     * - api (API routes)
+     * - _next/static (static files)
+     * - _next/image (image optimization files)
+     * - favicon.ico (favicon file)
+     * - public folder
+     */
+    '/((?!api|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|css|js|woff|woff2|ttf|eot)).*)',
+  ],
 };
