@@ -1,15 +1,17 @@
 'use client';
 // src/app/admin/page.tsx
-import { useAnalytics } from '@/hooks/useAnalytics';
-import { useUIStore } from '@/store/cartStore';
-import type { OrderStatus } from '@/types';
+
+// ✅ كل الـ imports بمسارات نسبية صحيحة
+import { useAnalytics } from '../../../hooks/useAnalytics';
+import { useUIStore } from '../../../store/cartStore';
+import type { OrderStatus } from '../../../types';
 
 const STATUS_COLOR: Record<OrderStatus, string> = {
   pending:          'bg-amber-100  text-amber-800  dark:bg-amber-900/30  dark:text-amber-300',
   confirmed:        'bg-blue-100   text-blue-800   dark:bg-blue-900/30   dark:text-blue-300',
   processing:       'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300',
   shipped:          'bg-cyan-100   text-cyan-800   dark:bg-cyan-900/30   dark:text-cyan-300',
-  out_for_delivery: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300', // ✅ السطر المضاف
+  out_for_delivery: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300',
   delivered:        'bg-green-100  text-green-800  dark:bg-green-900/30  dark:text-green-300',
   cancelled:        'bg-red-100    text-red-800    dark:bg-red-900/30    dark:text-red-300',
 };
