@@ -1,10 +1,13 @@
-// POST /api/paymob/callback — webhook from Paymob, verify HMAC, update order
-import { NextRequest } from 'next/server';
+// src/app/api/paymob/callback/route.ts
+
+// ✅ أضفنا NextResponse هنا
+import { NextRequest, NextResponse } from 'next/server';
 import { connectDB, Order } from '@/lib/mongodb';
 import { verifyPaymobWebhook } from '@/lib/paymob';
 import { ok, err, withErrorHandler } from '@/lib/api';
 import { enqueueEmail } from '@/lib/queue';
 
+// POST /api/paymob/callback — webhook from Paymob
 export const POST = withErrorHandler(async (req: NextRequest) => {
   const body = await req.json();
   const { obj, hmac } = body;
@@ -34,10 +37,13 @@ export const POST = withErrorHandler(async (req: NextRequest) => {
 });
 
 // GET — browser redirect after Paymob iframe
-export const GET = withErrorHandler(async (req: NextRequest) => {
+// ✅ أضفنا ', ctx: unknown' وغيّرنا Response → NextResponse
+export const GET = withErrorHandler(async (req: NextRequest, ctx: unknown) => {
   const url     = new URL(req.url);
   const success = url.searchParams.get('success') === 'true';
   const orderId = url.searchParams.get('order');
   const dest    = success ? `/success?order=${orderId}` : `/checkout?payment_failed=1`;
-  return Response.redirect(new URL(dest, process.env.NEXT_PUBLIC_APP_URL));
+  
+  // ✅ غيّرنا من Response.redirect إلى NextResponse.redirect
+  return NextResponse.redirect(new URL(dest, process.env.NEXT_PUBLIC_APP_URL!));
 });
