@@ -1,0 +1,285 @@
+# .github/workflows/ci.yml — HemaV064
+# V064: Updated header. LOW-01 confirmed: npm run typecheck already runs in job 3
+#   before build (job 6), blocking deployment on any TypeScript error.
+# HemaV045: Enterprise CI/CD: Secrets Scan → Lint → TypeCheck → Test → Build → Security → Deploy
+# Environments: development | staging | production
+
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [main, develop, 'release/**']
+  pull_request:
+    branches: [main, develop]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deploy target'
+        required: true
+        type: choice
+        options: [staging, production]
+      rollback:
+        description: 'Deployment ID to rollback to'
+        required: false
+        type: string
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  NODE_VERSION: '22'
+
+jobs:
+  # ── 0. Secrets Scanning (V045) ─────────────────────────────────────────────
+  secrets-scan:
+    name: Secrets Scan (Gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Gitleaks Scan
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ── 1. Change detection ───────────────────────────────────────────────────
+  changes:
+    name: Detect Changes
+    runs-on: ubuntu-latest
+    needs: secrets-scan
+    outputs:
+      src:   ${{ steps.filter.outputs.src }}
+      tests: ${{ steps.filter.outputs.tests }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            src:
+              - 'src/**'
+              - 'package.json'
+              - 'tsconfig.json'
+              - 'next.config.js'
+            tests:
+              - '__tests__/**'
+              - 'jest.config.ts'
+
+  # ── 2. Lint ───────────────────────────────────────────────────────────────
+  lint:
+    name: ESLint
+    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.src == 'true' || github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '${{ env.NODE_VERSION }}', cache: npm }
+      - run: npm ci --prefer-offline
+      - run: npm run lint
+
+  # ── 3. TypeScript ─────────────────────────────────────────────────────────
+  typecheck:
+    name: TypeScript
+    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.src == 'true' || github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '${{ env.NODE_VERSION }}', cache: npm }
+      - run: npm ci --prefer-offline
+      - run: npm run typecheck
+
+  # ── 4. Unit + Integration Tests ───────────────────────────────────────────
+  test-unit:
+    name: Unit & Integration Tests
+    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.src == 'true' || needs.changes.outputs.tests == 'true' || github.ref == 'refs/heads/main'
+    services:
+      redis:
+        image: redis:7-alpine
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      NODE_ENV:              test
+      NEXTAUTH_SECRET:       ${{ secrets.NEXTAUTH_SECRET }}
+      MONGODB_URI:           ${{ secrets.MONGODB_URI_TEST }}
+      REDIS_URL:             redis://localhost:6379
+      NEXT_PUBLIC_APP_URL:   http://localhost:3000
+      AUDIT_LOG_TTL_SECONDS: '2592000'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '${{ env.NODE_VERSION }}', cache: npm }
+      - run: npm ci --prefer-offline
+      - name: Run tests with coverage
+        run: npm run test:cov -- --forceExit --detectOpenHandles
+      - uses: codecov/codecov-action@v4
+        if: always()
+        with:
+          token:            ${{ secrets.CODECOV_TOKEN }}
+          files:            ./coverage/lcov.info
+          fail_ci_if_error: false
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name:           coverage-report
+          path:           coverage/
+          retention-days: 7
+
+  # ── 5. Security Audit ─────────────────────────────────────────────────────
+  security:
+    name: Security Audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '${{ env.NODE_VERSION }}', cache: npm }
+      - run: npm ci --prefer-offline
+      - run: npm audit --audit-level=high
+
+  # ── 6. Build & Secrets Validation (V045) ──────────────────────────────────
+  build:
+    name: Next.js Build
+    runs-on: ubuntu-latest
+    needs: [lint, typecheck, test-unit]
+    env:
+      NODE_ENV:                production
+      NEXTAUTH_SECRET:         ${{ secrets.NEXTAUTH_SECRET }}
+      MONGODB_URI:             ${{ secrets.MONGODB_URI_TEST }}
+      NEXT_PUBLIC_APP_URL:     https://hemafurniture.com
+      NEXT_TELEMETRY_DISABLED: 1
+      SECRETS_PROVIDER:        ${{ secrets.SECRETS_PROVIDER }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate Secrets Provider (V045)
+        run: |
+          if [[ -z "$SECRETS_PROVIDER" || "$SECRETS_PROVIDER" == "placeholder" ]]; then
+            echo "🚨 SECRETS_PROVIDER is unset or invalid. Deployment blocked."
+            exit 1
+          fi
+          if [[ "$SECRETS_PROVIDER" != "aws" && "$SECRETS_PROVIDER" != "env" ]]; then
+            echo "🚨 SECRETS_PROVIDER must be 'aws' or 'env'. Found: $SECRETS_PROVIDER"
+            exit 1
+          fi
+      - uses: actions/setup-node@v4
+        with: { node-version: '${{ env.NODE_VERSION }}', cache: npm }
+      - run: npm ci --prefer-offline
+      - run: npm run build
+      - uses: actions/upload-artifact@v4
+        with:
+          name:           nextjs-build
+          path:           .next/
+          retention-days: 1
+
+  # ── 7. E2E Tests ──────────────────────────────────────────────────────────
+  test-e2e:
+    name: Playwright E2E
+    runs-on: ubuntu-latest
+    needs: [build]
+    if: github.base_ref == 'main' || github.ref == 'refs/heads/main'
+    env:
+      NODE_ENV:            test
+      NEXTAUTH_SECRET:     ${{ secrets.NEXTAUTH_SECRET }}
+      MONGODB_URI:         ${{ secrets.MONGODB_URI_TEST }}
+      NEXT_PUBLIC_APP_URL: http://localhost:3000
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '${{ env.NODE_VERSION }}', cache: npm }
+      - run: npm ci --prefer-offline
+      - run: npx playwright install --with-deps chromium
+      - uses: actions/download-artifact@v4
+        with: { name: nextjs-build, path: .next/ }
+      - run: npm run test:e2e
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name:           playwright-report
+          path:           playwright-report/
+          retention-days: 7
+
+  # ── 8. Deploy Staging ─────────────────────────────────────────────────────
+  deploy-staging:
+    name: Deploy → Staging
+    runs-on: ubuntu-latest
+    needs: [build, security]
+    if: github.ref == 'refs/heads/develop'
+    environment:
+      name: staging
+      url:  ${{ steps.deploy.outputs.url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '${{ env.NODE_VERSION }}', cache: npm }
+      - run: npm ci --prefer-offline
+      - name: Deploy to Vercel (staging)
+        id: deploy
+        run: |
+          DEPLOY_URL=$(npx vercel deploy \
+            --token=${{ secrets.VERCEL_TOKEN }} \
+            2>&1 | grep -o 'https://[^ ]*' | head -1)
+          echo "url=$DEPLOY_URL" >> $GITHUB_OUTPUT
+        env:
+          VERCEL_ORG_ID:     ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+      - name: Smoke test
+        run: curl -f "${{ steps.deploy.outputs.url }}/api/healthz"
+
+  # ── 9. Deploy Production ──────────────────────────────────────────────────
+  deploy-production:
+    name: Deploy → Production
+    runs-on: ubuntu-latest
+    needs: [build, security, test-e2e]
+    if: github.ref == 'refs/heads/main'
+    environment:
+      name: production
+      url:  https://hemafurniture.com
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '${{ env.NODE_VERSION }}', cache: npm }
+      - run: npm ci --prefer-offline
+      - name: Deploy to Vercel (production)
+        run: |
+          npx vercel deploy --prod \
+            --token=${{ secrets.VERCEL_TOKEN }}
+        env:
+          VERCEL_ORG_ID:     ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+      - name: Smoke test
+        run: |
+          sleep 15
+          curl -f "https://hemafurniture.com/api/healthz"
+
+  # ── 10. Rollback (manual trigger) ──────────────────────────────────────────
+  rollback:
+    name: Rollback Production
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.rollback != ''
+    environment:
+      name: production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '${{ env.NODE_VERSION }}', cache: npm }
+      - run: npm ci --prefer-offline
+      - name: Rollback Vercel deployment
+        run: |
+          npx vercel rollback ${{ github.event.inputs.rollback }} \
+            --token=${{ secrets.VERCEL_TOKEN }}
+        env:
+          VERCEL_ORG_ID:     ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+      - name: Post-rollback smoke test
+        run: |
+          sleep 10
+          curl -f "https://hemafurniture.com/api/healthz"

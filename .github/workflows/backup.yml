@@ -1,0 +1,34 @@
+# .github/workflows/backup.yml — Daily automated backup
+name: Database Backup
+
+on:
+  schedule:
+    - cron: '30 2 * * *'  # daily at 02:30 UTC
+  workflow_dispatch:       # allow manual trigger
+
+jobs:
+  backup:
+    name: MongoDB Backup
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install mongodump
+        run: |
+          wget -qO - https://www.mongodb.org/static/pgp/server-7.0.asc | sudo apt-key add -
+          echo "deb [ arch=amd64,arm64 ] https://repo.mongodb.org/apt/ubuntu focal/mongodb-org/7.0 multiverse" | sudo tee /etc/apt/sources.list.d/mongodb-org-7.0.list
+          sudo apt-get update -qq && sudo apt-get install -y mongodb-database-tools
+      - name: Run backup
+        env:
+          MONGODB_URI:         ${{ secrets.MONGODB_URI_PROD }}
+          BACKUP_S3_BUCKET:    ${{ secrets.BACKUP_S3_BUCKET }}
+          AWS_ACCESS_KEY_ID:   ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION:  eu-central-1
+        run: bash scripts/backup.sh
+      - name: Notify on failure
+        if: failure()
+        uses: 8398a7/action-slack@v3
+        with:
+          status: failure
+          text:   '🚨 EHema database backup FAILED — manual intervention required!'
+          webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}

@@ -1,0 +1,132 @@
+# docker-compose.yml — V031
+# ──────────────────────────────────────────────────────────────────────────────
+# Changes from V030:
+# FIX — Ports bound to 127.0.0.1: MongoDB and Redis no longer exposed on all
+#        network interfaces. Only the host machine can reach them directly.
+# ──────────────────────────────────────────────────────────────────────────────
+
+services:
+  mongo:
+    image: mongo:7
+    container_name: hema-mongo
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USER:?MONGO_ROOT_USER is required}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASS:?MONGO_ROOT_PASS is required}
+      MONGO_INITDB_DATABASE: hema
+      MONGO_APP_USER: ${MONGO_APP_USER:?MONGO_APP_USER is required}
+      MONGO_APP_PASS: ${MONGO_APP_PASS:?MONGO_APP_PASS is required}
+    volumes:
+      - mongo-data:/data/db
+      - ./docker/mongo-init.js:/docker-entrypoint-initdb.d/01-init.js:ro
+    healthcheck:
+      test:
+        - "CMD"
+        - "mongosh"
+        - "--quiet"
+        - "--username"
+        - "${MONGO_ROOT_USER}"
+        - "--password"
+        - "${MONGO_ROOT_PASS}"
+        - "--authenticationDatabase"
+        - "admin"
+        - "--eval"
+        - "db.runCommand({ping:1}).ok"
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: hema-redis
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:6379:6379"
+    # Hema033 FIX [MED-05]: password is now passed via redis.conf (mounted read-only)
+    # instead of --requirepass CLI arg. The old approach exposed the password in
+    # `ps aux` and /proc/[pid]/cmdline to any user who can list processes.
+    # The entrypoint script substitutes ${REDIS_PASSWORD} into redis.conf at startup.
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        sed "s/REDIS_PASSWORD_PLACEHOLDER/$$REDIS_PASSWORD/" /etc/redis/redis.conf.tpl > /tmp/redis.conf
+        exec redis-server /tmp/redis.conf
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD is required}
+    volumes:
+      - redis-data:/data
+      - ./docker/redis.conf:/etc/redis/redis.conf.tpl:ro
+    healthcheck:
+      test:
+        - "CMD"
+        - "redis-cli"
+        - "-a"
+        - "${REDIS_PASSWORD}"
+        - "ping"
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runner
+    container_name: hema-app
+    restart: unless-stopped
+    ports:
+      # V039 SECURITY FIX [HIGH-02]: bind to 127.0.0.1 so only nginx (on the same host)
+      # can reach the Node.js server. Without this, port 3000 is open on all interfaces,
+      # allowing direct internet access that bypasses the WAF, TLS termination, and
+      # nginx-level rate limiting.
+      - "127.0.0.1:3000:3000"
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      MONGODB_URI: mongodb://${MONGO_APP_USER}:${MONGO_APP_PASS}@mongo:27017/hema?authSource=hema
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
+    depends_on:
+      mongo:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    # MED-06 FIX (V062): Container hardening — prevent privilege escalation and
+    # limit blast radius of a container escape.
+    # no-new-privileges: prevents execve()-based privilege escalation via SUID bits.
+    # read_only: filesystem is read-only; writes only permitted to tmpfs mounts.
+    # tmpfs /tmp: ephemeral temp storage (100 MB, sticky bit for multi-user safety).
+    # tmpfs /app/.next/cache: Next.js build cache write target on read-only FS.
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp:size=100m,mode=1777
+      - /app/.next/cache:size=500m
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: worker
+    container_name: hema-worker
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      MONGODB_URI: mongodb://${MONGO_APP_USER}:${MONGO_APP_PASS}@mongo:27017/hema?authSource=hema
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
+    depends_on:
+      # FIND-013 FIX: worker connects directly to mongo and redis — not through app.
+      # Depending on app:service_started introduced an unnecessary startup race condition.
+      mongo:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+volumes:
+  mongo-data:
+  redis-data:

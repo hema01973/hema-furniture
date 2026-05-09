@@ -1,0 +1,7 @@
+Contact: mailto:security@hemafurniture.com
+Expires: 2027-05-02T00:00:00.000Z
+Acknowledgments: https://hemafurniture.com/security/hall-of-fame
+Preferred-Languages: ar, en
+Canonical: https://hemafurniture.com/.well-known/security.txt
+Policy: https://hemafurniture.com/security/policy
+Hiring: https://hemafurniture.com/careers

@@ -1,0 +1,26 @@
+node_modules
+.next
+.git
+*.log
+.env*
+!.env.example
+coverage
+playwright-report
+__tests__
+*.test.ts
+*.spec.ts
+.turbo
+README.md
+
+# ARCH-003 FIX (V071): Analysis and documentation files (not needed in build context)
+# These files bloat the Docker build context and slow CI without benefit.
+FIXES_*.md
+*_Report.md
+*_Analysis.md
+SECURITY_FIXES_*.md
+scientific_analysis.md
+Hema.md
+load-tests/
+__tests__/
+coverage/
+.nyc_output/

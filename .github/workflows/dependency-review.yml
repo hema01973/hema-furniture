@@ -1,0 +1,24 @@
+# .github/workflows/dependency-review.yml — HemaV045
+# Automatically reviews dependency changes in PRs for vulnerabilities.
+
+name: Dependency Review
+
+on:
+  pull_request:
+    branches: [main, develop]
+
+permissions:
+  contents:      read
+  pull-requests: write
+
+jobs:
+  dependency-review:
+    name: Dependency Review
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: high
+          comment-summary-in-pr: always
+          warn-only: false

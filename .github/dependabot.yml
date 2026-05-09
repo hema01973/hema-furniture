@@ -1,0 +1,35 @@
+# .github/dependabot.yml — HemaV062
+# LOW-06 FIX (V062): Automated dependency vulnerability tracking.
+# Security updates are grouped and capped at 5 open PRs to avoid overwhelming the team.
+# All packages are included in the security group to ensure CVE patches are surfaced promptly.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:00"
+      timezone: "Africa/Cairo"
+    groups:
+      security:
+        patterns:
+          - "*"
+        update-types:
+          - "security"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "security"
+    commit-message:
+      prefix: "chore(deps)"
+      prefix-development: "chore(deps-dev)"
+    # Ignore major version bumps for core deps that require migration work.
+    # Remove from ignore list when ready to migrate.
+    ignore:
+      - dependency-name: "next"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "react"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "react-dom"
+        update-types: ["version-update:semver-major"]
