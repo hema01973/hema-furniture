@@ -12,7 +12,7 @@ const { withSentryConfig } = (() => {
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   // Standalone output for Docker (set via DOCKER_BUILD env)
-  output: process.env.DOCKER_BUILD === 'true' ? 'standalone' : undefined,
+    output: undefined,
 
   images: {
     formats: ['image/avif', 'image/webp'],
