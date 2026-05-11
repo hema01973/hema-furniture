@@ -100,7 +100,7 @@ function buildSecurityHeaders(nonce: string): Record<string, string> {
     // في production مع custom domain، فكِّر في إزالته إن لم يُستخدم.
     // بديل: استخدم VERCEL_ENV env var لإضافته بشكل شرطي فقط في non-production.
     `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${process.env.VERCEL_ENV !== 'production' ? ' https://vercel.live' : ''}`,
-    //`style-src 'self' 'nonce-${nonce}'`,
+   `style-src 'self' 'nonce-${nonce}' 'unsafe-inline'`,
     `trusted-types 'allow-duplicates' default`,
     `img-src 'self' data: blob: https://res.cloudinary.com https://images.unsplash.com https://placehold.co`,
     `font-src 'self'`,
