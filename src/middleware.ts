@@ -102,7 +102,7 @@ function buildSecurityHeaders(nonce: string): Record<string, string> {
     `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${process.env.VERCEL_ENV !== 'production' ? ' https://vercel.live' : ''}`,
    `style-src 'self' 'nonce-${nonce}' 'unsafe-inline'`,
     //`trusted-types 'allow-duplicates' default`,
-    `trusted-types * 'allow-duplicates'`,
+    // `trusted-types * 'allow-duplicates'`,
     `img-src 'self' data: blob: https://res.cloudinary.com https://images.unsplash.com https://placehold.co`,
     `font-src 'self'`,
     // MED-02 FIX: QStash origin added conditionally when QSTASH_URL is set.
