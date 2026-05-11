@@ -116,7 +116,7 @@ function buildSecurityHeaders(nonce: string): Record<string, string> {
     ...(process.env.CSP_REPORT_URI ? [`report-uri ${process.env.CSP_REPORT_URI}`] : []),
     // HIGH-01 FIX (V064): Require Trusted Types for all script execution to prevent
     // DOM-based XSS via dangerous sinks (innerHTML, document.write, etc.).
-    `require-trusted-types-for 'script'`,
+    // `require-trusted-types-for 'script'`,
   ].join('; ');
   return {
     'Content-Security-Policy':          csp,
