@@ -7,6 +7,7 @@ import { Toaster } from 'react-hot-toast';
 import { Analytics }     from '@vercel/analytics/react';
 import { SpeedInsights } from '@vercel/speed-insights/next';
 import Providers from './providers';
+import { TrustedTypesProvider } from '@/components/TrustedTypesProvider';
 import './globals.css';
 
 const cormorant = Cormorant_Garamond({ subsets: ['latin'], weight: ['400','500','600'], style: ['normal','italic'], variable: '--font-serif', display: 'swap' });
@@ -30,7 +31,6 @@ export const metadata: Metadata = {
 };
 
 // ── Viewport — must be exported separately in Next.js 14+ ─────────
-// Putting themeColor/width inside `metadata` causes a deprecation warning.
 export const viewport: Viewport = {
   width:        'device-width',
   initialScale: 1,
@@ -57,6 +57,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <link rel="preconnect" href="https://res.cloudinary.com" />
       </head>
       <body className={[cormorant.variable, dmSans.variable, tajawal.variable, 'font-sans antialiased', 'bg-[#FAF8F5] text-[#1A1208]', 'dark:bg-[#0E0904] dark:text-[#F0EBE2]', 'transition-colors duration-300', lang === 'ar' ? 'font-arabic' : ''].filter(Boolean).join(' ')}>
+        <TrustedTypesProvider />
         <Providers nonce={nonce} initialLang={lang}>
           {children}
           <Toaster
