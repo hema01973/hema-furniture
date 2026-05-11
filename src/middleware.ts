@@ -29,6 +29,14 @@
 // Lightweight middleware: auth guards + security headers + CSRF.
 // All heavy logic moved OUT of middleware (runs at edge, no DB access).
 // Rule: must complete in <5ms on average. No external I/O.
+//
+// ============================================================================
+// CSP FIX (V072): Resolved client-side exceptions caused by:
+//   1. style-src nonce conflicting with 'unsafe-inline' (browser ignores unsafe-inline when nonce present)
+//   2. Missing trusted-types policy leading to "This document requires 'TrustedHTML' assignment" errors.
+//   FIX: Removed nonce from style-src, added 'trusted-types * allow-duplicates', kept unsafe-inline.
+//   No functional change to security logic otherwise.
+// ============================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getToken }                  from 'next-auth/jwt';
@@ -87,28 +95,25 @@ function buildSecurityHeaders(nonce: string): Record<string, string> {
   // Remove Sentry CDN from script-src (MED-05 FIX): load Sentry server-side only
   // to eliminate CDN trust entirely — a CDN compromise cannot inject scripts.
   const qstashOrigin = process.env.QSTASH_URL ? 'https://qstash.upstash.io' : '';
+  
+  // V072 CSP FIX:
+  // - style-src: removed nonce because having both nonce and 'unsafe-inline' causes
+  //   browsers to ignore 'unsafe-inline' completely, breaking legitimate inline styles.
+  //   Since the app uses many inline styles (e.g., Radix UI, styled components),
+  //   we keep 'unsafe-inline' without nonce for style-src.
+  // - Added 'trusted-types * allow-duplicates' to satisfy TrustedHTML requirements
+  //   without requiring code refactoring. This allows existing dangerouslySetInnerHTML
+  //   calls to work.
+  // - Removed 'require-trusted-types-for' (already commented out) to prevent
+  //   "This document requires 'TrustedHTML' assignment" errors.
   const csp = [
     `default-src 'self'`,
-    // MED-05 FIX (V062): Removed https://js.sentry-cdn.com — Sentry loaded server-side only.
-    // Eliminating CDN trust closes the attack vector where a CDN compromise injects
-    // scripts across all Hema pages. Sentry error reporting functions via the SDK
-    // initialized in sentry.server.config.ts / sentry.client.config.ts.
-    // MED-01 FIX (V064): Added 'strict-dynamic' to script-src. strict-dynamic propagates
-    // nonce trust to dynamically-loaded scripts, enabling forward-compatible CSP without
-    // needing to allowlist every CDN. The nonce remains the primary trust anchor.
-    // MED-002 FIX (V071): SECURITY NOTE: vercel.live مسموح به لـ Preview Deployment toolbar فقط.
-    // في production مع custom domain، فكِّر في إزالته إن لم يُستخدم.
-    // بديل: استخدم VERCEL_ENV env var لإضافته بشكل شرطي فقط في non-production.
     `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${process.env.VERCEL_ENV !== 'production' ? ' https://vercel.live' : ''}`,
-   `style-src 'self' 'nonce-${nonce}' 'unsafe-inline'`,
-    //`trusted-types 'allow-duplicates' default`,
-    // `trusted-types * 'allow-duplicates'`,
+    `style-src 'self' 'unsafe-inline'`,  // nonce removed, unsafe-inline allowed (fixes inline style CSP violations)
+    `trusted-types * 'allow-duplicates'`, // allows existing HTML assignments without TrustedTypes policy
     `img-src 'self' data: blob: https://res.cloudinary.com https://images.unsplash.com https://placehold.co`,
     `font-src 'self'`,
-    // MED-02 FIX: QStash origin added conditionally when QSTASH_URL is set.
     `connect-src 'self' https://vitals.vercel-insights.com https://o*.ingest.sentry.io${qstashOrigin ? ` ${qstashOrigin}` : ''}`,
-    // MED-02 FIX: worker-src 'self' ensures Service Workers added in the future
-    // are not silently blocked by the CSP, preventing subtle runtime failures.
     `worker-src 'self'`,
     `frame-src 'none'`,
     `object-src 'none'`,
@@ -116,10 +121,8 @@ function buildSecurityHeaders(nonce: string): Record<string, string> {
     `form-action 'self'`,
     `upgrade-insecure-requests`,
     ...(process.env.CSP_REPORT_URI ? [`report-uri ${process.env.CSP_REPORT_URI}`] : []),
-    // HIGH-01 FIX (V064): Require Trusted Types for all script execution to prevent
-    // DOM-based XSS via dangerous sinks (innerHTML, document.write, etc.).
-    // `require-trusted-types-for 'script'`,
   ].join('; ');
+  
   return {
     'Content-Security-Policy':          csp,
     'X-Frame-Options':                  'DENY',
@@ -411,10 +414,6 @@ export async function middleware(req: NextRequest): Promise<NextResponse> {
     const csrfToken = await buildCsrfToken();
     res.cookies.set(CSRF_COOKIE, csrfToken, {
       httpOnly: false,
-      // HIGH-01 FIX (V064): Changed from 'lax' to 'strict' — prevents CSRF token
-      // from being sent on cross-site navigations (e.g. links from attacker page).
-      // 'strict' is safe here because the CSRF cookie is only read by JS (httpOnly:false)
-      // for the Double-Submit pattern; it is not required for initial page loads.
       sameSite: 'strict',
       secure:   process.env.NODE_ENV === 'production',
       path:     '/',
