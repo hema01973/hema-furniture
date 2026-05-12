@@ -167,7 +167,7 @@ export default function HomePage() {
               {t.heroSub}
             </p>
             <div className="flex gap-4 flex-wrap">
-              <Link href="/shop" className={`bg-[#B8935A] hover:bg-[#D4B07A] text-white font-semibold px-8 py-4 rounded-xl transition-all hover:translate-y-[-1px] hover:shadow-lg ${isAr ? 'font-arabic' : ''}`}>{t.shopNow}</Link>
+              <Link href="/store/shop" className={`bg-[#B8935A] hover:bg-[#D4B07A] text-white font-semibold px-8 py-4 rounded-xl transition-all hover:translate-y-[-1px] hover:shadow-lg ${isAr ? 'font-arabic' : ''}`}>{t.shopNow}</Link>
               <Link href="/about" className={`border-2 border-white/20 hover:border-white/40 text-[#FAF8F5] font-semibold px-8 py-4 rounded-xl transition-all hover:bg-white/5 ${isAr ? 'font-arabic' : ''}`}>{t.ourStory}</Link>
             </div>
             <div className="flex gap-10 mt-14 pt-10 border-t border-white/10">
@@ -191,7 +191,7 @@ export default function HomePage() {
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
             {cats.map(c => (
-              <Link key={c.key} href={`/shop?category=${c.key}`}
+              <Link key={c.key} href={`/store/shop?category=${c.key}`}
                 className="bg-white dark:bg-[#221710] border border-[#E8DDD0] dark:border-[#2A1F14] rounded-2xl p-7 text-center hover:border-[#B8935A] hover:-translate-y-1 hover:shadow-md transition-all duration-300 group">
                 <span className="text-4xl block mb-3">{c.icon}</span>
                 <div className={`font-medium text-sm text-[#1A1208] dark:text-[#F0EBE2] group-hover:text-[#B8935A] transition-colors ${isAr ? 'font-arabic' : ''}`}>{c.label}</div>
@@ -209,7 +209,7 @@ export default function HomePage() {
               <div className="flex items-center gap-3 mb-3"><div className="w-6 h-px bg-[#B8935A]"/><span className={`text-[#B8935A] text-xs font-semibold tracking-[3px] uppercase ${isAr ? 'font-arabic' : ''}`}>{t.handpicked}</span></div>
               <h2 className={`${isAr ? 'font-arabic' : 'font-serif'} text-4xl text-[#1A1208] dark:text-[#F0EBE2] font-normal`}>{t.featured}</h2>
             </div>
-            <Link href="/shop" className={`border border-[#E8DDD0] dark:border-[#2A1F14] text-[#1A1208] dark:text-[#F0EBE2] hover:border-[#B8935A] hover:text-[#B8935A] font-medium px-5 py-2.5 rounded-xl transition-all text-sm hidden sm:block ${isAr ? 'font-arabic' : ''}`}>{t.viewAll}</Link>
+            <Link href="/store/shop" className={`border border-[#E8DDD0] dark:border-[#2A1F14] text-[#1A1208] dark:text-[#F0EBE2] hover:border-[#B8935A] hover:text-[#B8935A] font-medium px-5 py-2.5 rounded-xl transition-all text-sm hidden sm:block ${isAr ? 'font-arabic' : ''}`}>{t.viewAll}</Link>
           </div>
           {products.length === 0 ? (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-5">{Array.from({length:8}).map((_,i)=><div key={i} className="bg-white dark:bg-[#1A1208] rounded-2xl h-72 animate-pulse border border-[#E8DDD0] dark:border-[#2A1F14]"/>)}</div>
@@ -245,7 +245,7 @@ export default function HomePage() {
         <div className="max-w-2xl mx-auto">
           <h2 className={`${isAr ? 'font-arabic' : 'font-serif'} text-5xl text-[#FAF8F5] font-normal mb-4`}>{t.promoTitle}</h2>
           <p className={`text-[#B8A090] text-lg mb-8 ${isAr ? 'font-arabic' : ''}`}>{t.promoSub}</p>
-          <Link href="/shop?badge=Sale" className={`inline-block bg-[#B8935A] hover:bg-[#D4B07A] text-white font-semibold px-10 py-4 rounded-xl transition-all hover:translate-y-[-1px] ${isAr ? 'font-arabic' : ''}`}>{t.promoCta}</Link>
+          <Link href="/store/shop?badge=Sale" className={`inline-block bg-[#B8935A] hover:bg-[#D4B07A] text-white font-semibold px-10 py-4 rounded-xl transition-all hover:translate-y-[-1px] ${isAr ? 'font-arabic' : ''}`}>{t.promoCta}</Link>
         </div>
       </section>
 
