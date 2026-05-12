@@ -169,7 +169,12 @@ const nextConfig = {
   async redirects() {
     return [
       {
-        source: '/admin/login',
+        source: '/shop',
+          destination: '/store/shop',
+          permanent: true,
+        },
+        {
+          source: '/admin/login',
         destination: '/login',
         permanent: true,
       },
