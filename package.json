@@ -37,6 +37,10 @@
     "migrate:bcrypt": "tsx scripts/migrate-bcrypt-to-argon2.ts",
     "migrate:bcrypt:dry": "DRY_RUN=true tsx scripts/migrate-bcrypt-to-argon2.ts"
   },
+  "overrides": {
+    "whatwg-encoding": "1.0.5",
+    "html-encoding-sniffer": "2.0.1"
+  },
   "dependencies": {
     "@hookform/resolvers": "3.10.0",
     "@node-rs/argon2": "2.0.0",
