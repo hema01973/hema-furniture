@@ -40,7 +40,8 @@
   "overrides": {
     "whatwg-encoding": "1.0.5",
     "html-encoding-sniffer": "2.0.1",
-    "whatwg-url": "11.0.0"
+    "whatwg-url": "11.0.0",
+    "jsdom": "20.0.3"
   },
   "dependencies": {
     "@hookform/resolvers": "3.10.0",
