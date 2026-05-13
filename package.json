@@ -39,7 +39,8 @@
   },
   "overrides": {
     "whatwg-encoding": "1.0.5",
-    "html-encoding-sniffer": "2.0.1"
+    "html-encoding-sniffer": "2.0.1",
+    "whatwg-url": "11.0.0"
   },
   "dependencies": {
     "@hookform/resolvers": "3.10.0",
